@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_GRAPHICS
 
 // TODO(b/129481165): remove the #pragma below and fix conversion issues
@@ -531,17 +531,15 @@ auto RefreshRateConfigs::getBestRefreshRateLocked(const std::vector<LayerRequire
             ? getMaxScoreRefreshRate(scores.rbegin(), scores.rend())
             : getMaxScoreRefreshRate(scores.begin(), scores.end());
 
-    const auto selectivelyForceIdle = [&] () REQUIRES(mLock)
-            -> std::pair<DisplayModePtr, GlobalSignals> {
+    const auto selectivelyForceIdle = [&] () -> std::pair<DisplayModePtr, GlobalSignals>  {
         ALOGV("localIsIdle: %s", localIsIdle ? "true" : "false");
-        if (localIsIdle && mIdleRefreshRateModeIt != NULL
-                && isStrictlyLess(60_Hz, bestRefreshRate->getFps())) {
+        if (localIsIdle && isStrictlyLess(60_Hz, bestRefreshRate->getFps())) {
             /*
              * We heavily rely on touch to boost higher than 60 fps.
              * Fallback to 60 fps if an higher fps was calculated.
              */
             ALOGV("Forcing idle");
-            return {mIdleRefreshRateModeIt->second, kNoSignals};
+            return {mIdleRefreshRate, kNoSignals};
         }
 
         return {bestRefreshRate, kNoSignals};
@@ -946,6 +944,10 @@ void RefreshRateConfigs::constructAvailableRefreshRates() {
             for (const auto modeIt : modes) {
                 str += to_string(modeIt->second->getFps());
                 str.push_back(' ');
+                if (isApproxEqual(modeIt->second->getFps(), 60_Hz)) {
+                    mIdleRefreshRate = modeIt->second;
+                    ALOGV("idleRefreshRate set!");
+                }
             }
             return str;
         };
